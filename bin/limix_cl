@@ -1,0 +1,182 @@
+#!/usr/bin/env python2
+
+from limix_cl import __version__
+import limix_cl
+import numpy as np
+import pandas as pd
+
+import argparse
+import os
+
+def check_df_nan(df):
+    """
+    Tests if nan values are in a dataframe. If true raises ValueError.
+    
+    Parameters
+    ----------
+    df : pd.df
+        Pandas data frame to check
+    
+    Returns
+    -------
+    Nothing
+    """
+    # make sure no NaN as currently not supported. 
+    # TODO use utils mean impute function
+    if np.any(np.isnan((df).values)):
+        filt=np.isnan((df).mean(axis=1))
+        print df.loc[filt,]
+        raise ValueError("Error NaN in an input df.")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=
+            """
+            Fits a linear model using LIMIX. 
+            Designed to enable swarming over entries of a y dataframe on a 
+            cluster. This script is particularly useful to swarm permutation   
+            jobs. 
+            
+            Currently, the whole y file will be read into memory 
+            initially so user should plan accordingly when allocating job
+            memory. Clearly, chunking is a key feature to add to this program.
+            
+            Within the execution dir this script will create a "swarm-data" dir 
+            where each iteration is saved as a different csv file. Global 
+            parameters are recorded in "swarm-settings.txt".
+            """)
+    
+    parser.add_argument('-v', '--version', action='version', 
+        version='%(prog)s {version}'.format(version=__version__))
+    
+    parser.add_argument('-yf', '--y_file', action='store', dest='yf', 
+        required=True, 
+        help="csv file with y molecular features (e.g., genes). \
+            Rows = features and columns = sample ids. \
+            First column assumed to be row label that is unique per row."),
+    
+    # x file should be different depending on function
+    parser.add_argument('-xf', '--x_file', action='store', dest='xf', 
+        required=True, 
+        help="csv file with x features (e.g., clinical traits). \
+            Rows = features and columns = sample ids. \
+            First column assumed to be row label (sample id) that is unique \
+            per row."),
+    
+    parser.add_argument('-cf', '--covariates_file', action='store', dest='cf',
+        required=False, default=None,
+        help='csv file of covariates. (default: %(default)s)'),
+    
+    # parser.add_argument('-cf', '--covariance_file', action='store', dest='cf',
+    #     default=None,
+    #     help="Covariance matrix (nxn). First column should be sample ids for \
+    #          the rows. The other columns should be sample ids. This \
+    #          covariance matrix should NOT be standardized.")
+    
+    parser.add_argument('-sf', '--sample_file', action='store', dest='sf',
+        default=None,
+        help="sample file. list of samples ids to subset to \
+            (if none we will use all samples, defined by y file) \
+            (default: %(default)s)")
+    
+    parser.add_argument('-f', '--fold', action='store', dest='f', 
+        type=int, default=1, 
+        help="number of batches to divide all y file tests into \
+            (must be consistent through entire submission). \
+            (default: %(default)s)"),
+    
+    parser.add_argument('-i', '--iteration', action='store', dest='i', 
+        type=int, default=0, 
+        help="current batch. 0 based. Valid range = 0 to fold-1. \
+            (default: %(default)s)")
+    
+    parser.add_argument('-p', '--permute', action='store', dest='p', 
+        type=int, default=0, 
+        help="number of permutations (permutes x_data sample ids). If 0, no \
+            permutations performed. (default: %(default)s)")
+    
+    parser.add_argument('-ps', '--permute_seed', action='store', dest='ps', 
+        type=int, default=99, 
+        help="seed to use for permutations. (default: %(default)s)")
+    
+    options = parser.parse_args()
+    
+    # read in y file
+    y_dat = pd.read_csv(options.yf, sep=',', index_col=0) 
+    # dtype={"labelcode_pheno":str, "labelcode_genotype":str})
+    check_df_nan(y_dat)
+    
+    # read in x file
+    x_dat = pd.read_csv( options.xf, sep=',', index_col=0)
+    check_df_nan(x_dat)
+    
+    # subset down to common samples between x and y
+    smpls = y_dat.index.intersection(x_dat.index)
+    print "detected %d common samples between x and y dataframes." \
+        % (len(smpls))
+    y_dat = y_dat.loc[smpls.values,:]
+    x_dat = x_dat.loc[smpls.values,:]
+    
+    # subset to pre-defined sample ids
+    if options.sf:
+        #set the columns to string dtype
+        smpls_sub = pd.read_csv(options.sf, header=None, dtype={"0":str})
+        smpls_sub = smpls_sub.astype(str).values.ravel()
+        smpls_sub = np.sort(smpls_sub)
+        
+        smpls = smpls.intersection(smpls_sub)
+        print "detected %d samples after sample subsetting file." \
+            % (len(smpls))
+        y_dat = y_dat.loc[smpls.values,:]
+        x_dat = x_dat.loc[smpls.values,:]
+    
+    if options.cf:
+        cov_dat = pd.read_csv(options.cf, sep=',', index_col=0)
+        #covs.index = covs.index.map(str)
+        
+        smpls = smpls.intersection(cov_dat.index)
+        print "detected %d common samples after adding covariate dataframe." \
+            % (len(smpls))
+        y_dat = y_dat.loc[smpls.values,:]
+        x_dat = x_dat.loc[smpls.values,:]
+        cov_dat = cov_dat.loc[smpls.values,:]
+        
+        check_df_nan(cov_dat)
+    else:
+        cov_dat = None
+    
+    # read in matrix
+    # if options.cf:
+    #     cov_mtx = pd.read_csv(options.cf, index_col=0,
+    #           dtype={"sample_id":str}) #set the columns to string dtype
+    #     cov_mtx.columns = cov_mtx.columns.astype(str)
+    #     cov_mtx = cov_mtx.set_index( cov_mtx.index.astype(str) )
+    #     cov_mtx = cov_mtx.loc[samples.ravel(),samples.ravel()]
+    #     cov_mtx = cov_mtx.values #make numpy mtx
+    #     cov_mtx.loc[samples.ravel(),samples.ravel()]
+    
+    # parallelize_yfeatures function is expecting a y dataframe of 
+    # rows = features and samples = columns. 
+    # Therefore transpose the y dataframe which is read in as the opposite. 
+    # TODO allow user to transpose any of the input dataframes
+    y_dat = y_dat.T
+    
+    result = limix_cl.utils.parallelize_yfeatures(
+        out_dir = os.getcwd(),
+        function = limix_cl.limix_lmm.linear_model,
+        y_dat = y_dat,
+        x_dat = x_dat,
+        covariates = cov_dat,
+        #covariance_matrix = cov_mtx, # TODO: implement
+        nfolds = options.f,
+        fold_i = options.i,
+        permute = options.p != 0,
+        n_permute = options.p, 
+        permute_seed = options.ps
+        )
+    
+    return 0
+
+if __name__ == '__main__':
+    main()

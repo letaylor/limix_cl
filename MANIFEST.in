@@ -1,0 +1,4 @@
+include LICENSE
+include README.rst
+include limix_cl/tests/data/*.csv
+include limix_cl/tests/data/*.txt
