@@ -55,6 +55,9 @@ setup(
     license=license,
     install_requires=requirements,
     packages=find_packages(exclude=('bin', 'docs')),
+    dependency_links=[
+        'http://github.com/nfusi/qvalue.git',
+    ],
     setup_requires=[
         'pytest-runner',
     ],

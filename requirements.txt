@@ -2,7 +2,6 @@ pytest
 pytest_runner
 setuptools
 sphinx
-qvalue
 numpy
 scipy
 pandas
