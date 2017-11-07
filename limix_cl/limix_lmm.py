@@ -9,7 +9,7 @@ import scipy as sp
 import pandas as pd
 import warnings
 
-import qvalue
+#import qvalue # not used
 import limix.qtl.qtl as qtl
 
 #sp.random.seed(10) # set global seed
