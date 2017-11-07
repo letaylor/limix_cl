@@ -77,5 +77,7 @@ You may find errors relating to *machine_ffi* or *liknorm*. This is due to the `
     
     # install liknorm pip, passing the local install of the headers
     pip install liknorm --global-option=build_ext --global-option="-I$HOME/include/" --global-option="-L$HOME/lib"
-
-
+    
+    # note: you may also need to update your LD_LIBRARY_PATH
+    #export LD_LIBRARY_PATH=$HOME/lib:$LD_LIBRARY_PATH
+    
