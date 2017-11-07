@@ -62,3 +62,20 @@ The limix_cl installation automatically includes an execution script which can b
     rm -r swarm-*
 
 
+Install Notes
+-------------
+
+You may find errors relating to *machine_ffi* or *liknorm*. This is due to the `liknorm <https://github.com/limix/liknorm/>`_ package required by limix. You may need to manually install the liknorm headers to locally. Below are commands that should do that (drived from https://liknorm.readthedocs.io/en/stable)::
+    
+    # install liknorm headers locally
+    git clone https://github.com/glimix/liknorm.git
+    cd liknorm
+    mkdir build
+    cd build
+    cmake .. -DCMAKE_INSTALL_PREFIX:PATH=$HOME
+    make
+    
+    # install liknorm pip, passing the local install of the headers
+    pip install liknorm --global-option=build_ext --global-option="-I$HOME/include/" --global-option="-L$HOME/lib"
+
+
