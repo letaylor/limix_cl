@@ -11,7 +11,7 @@ utils
 limix_lmm
     methods that use limix
 """
-__version__ = '0.1.0'
+__version__ = '0.1.1.dev0'
 __all__ = ["limix_lmm", "utils"]
 
 from . import utils
