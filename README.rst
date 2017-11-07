@@ -74,6 +74,7 @@ You may find errors relating to *machine_ffi* or *liknorm*. This is due to the `
     cd build
     cmake .. -DCMAKE_INSTALL_PREFIX:PATH=$HOME
     make
+    make install
     
     # install liknorm pip, passing the local install of the headers
     pip install liknorm --global-option=build_ext --global-option="-I$HOME/include/" --global-option="-L$HOME/lib"
